@@ -69,7 +69,19 @@ Miniconda is a lightweight Python package manager. It lets you create isolated P
 
 ---
 
-### Step 2 — Clone your repository
+### Step 2 — Install Git (Windows only)
+
+Mac comes with Git pre-installed. Windows users need to install it manually.
+
+1. Go to https://git-scm.com/download/win and download the installer
+2. Run the installer — the default options are fine, just click through
+3. To verify: open a new Anaconda Prompt, type `git --version`, and press Enter — you should see something like `git version 2.x.x`
+
+> **Note:** If you installed Git but Anaconda Prompt still says `git: command not found`, close and reopen Anaconda Prompt, then try again.
+
+---
+
+### Step 4 — Clone your repository
 
 On your GitHub Classroom repo page, click the green **Code** button and copy the URL. Then in Terminal (Mac) or Anaconda Prompt (Windows) run:
 
@@ -85,7 +97,7 @@ cd time-series-analysis-<your-username>
 
 ---
 
-### Step 3 — Create the course environment
+### Step 5 — Create the course environment
 
 This installs all the Python packages needed for the lab into an isolated environment called `mae223`.
 
@@ -104,7 +116,7 @@ The first command activates the environment. The second registers it as a kernel
 
 ---
 
-### Step 4 — Install VS Code
+### Step 6 — Install VS Code
 
 1. Download and install VS Code from https://code.visualstudio.com
 2. Open VS Code and go to the **Extensions** panel — click the square icon on the left sidebar or press `Cmd+Shift+X` (Mac) / `Ctrl+Shift+X` (Windows)
@@ -114,7 +126,7 @@ The first command activates the environment. The second registers it as a kernel
 
 ---
 
-### Step 5 — Open the notebooks
+### Step 7 — Open the notebooks
 
 There are two notebooks and they should be done **in order**:
 
@@ -148,7 +160,7 @@ You will apply the full analysis pipeline to a new dataset: significant wave hei
 
 ---
 
-### Step 6 — Save your work to GitHub
+### Step 8 — Save your work to GitHub
 
 Push your changes to GitHub periodically as you work through the notebook — this keeps your code backed up and lets you pick up where you left off from any computer.
 
