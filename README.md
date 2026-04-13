@@ -1,175 +1,347 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/6OJMKMJx)
-# MAE223 — Week 1: Time Series Analysis
+# RTK GPS Marine Buoy Data Logging System
 
-Starter repository for the Week 1 Time Series Analysis lab.
+A centimeter-level precision GPS data logging system for oceanographic applications, combining RTK GPS positioning with IMU sensor data collection. Developed at UCSD Scripps Institution of Oceanography.
 
-## Files
+## Overview
 
-| File | Description |
-|------|-------------|
-| `Tidal Analysis_Python.ipynb` | **Start here** — fully written demo notebook |
-| `Tutorial_SpectralAnalysis.ipynb` | **Then here** — hands-on tutorial, you write the code |
-| `sample_data.json` | Velocity time series (CLASS10 mooring, 30-min sampling, 16,000 samples) |
-| `la_jolla_tide.json` | NOAA La Jolla tide gauge sea level — full ~100-year record, hourly, in mm |
-| `safari_waves.json` | SAFARI buoy significant wave height — central Pacific, Nov 2025–Apr 2026, ~2-hr sampling (Scripps/WHOI collaboration) |
-| `environment.yml` | Conda environment specification |
-| `github_tutorial.pdf` | Guide to GitHub and GitHub Classroom for first-time users |
+This system achieves centimeter-level positioning accuracy by receiving Real-Time Kinematic (RTK) corrections via NTRIP protocol over cellular networks. It consists of two main components:
+
+1. **ESP32 + SIM7000 LTE Module** - Handles cellular connectivity and NTRIP correction streaming
+2. **OpenLog Artemis Data Logger** - Records high-precision GPS data and IMU measurements to SD card
 
 ---
 
-## Setup (do this once)
+## Hardware Requirements
 
-### Step 0 — Create a GitHub account
+- SparkFun ZED-F9P-02B-00 (RTK GPS receiver module)
+- Botletics SIM7000 LTE Shield + board
+- SparkFun OpenLog Artemis (data logger with built-in ICM-20948 IMU)
+- SparkFun ESP32 Thing Plus
+- u-blox ANN-MB1-00-00 Antenna with grounding plate
+- LiPo Battery 3.7V 6000mAh 22.2Wh (for OpenLog Artemis + GPS)
+- LiPo Battery 3.7V 850mAh 3.145Wh (for ESP32 + cellular modem)
+- Hologram SIM Card
+- MicroSD Card (FAT32 formatted)
 
-You need a free GitHub account to access this assignment.
+### Wiring
 
-1. Go to [github.com](https://github.com) and click **Sign up**
-2. Enter your email, a password, and a username
-   - Your username will be visible to your instructor — keep it professional
-   - Using your UCSD email is recommended but not required
-3. Verify your email address when prompted
-4. Once your account is active, click the assignment link posted on Canvas
-5. Click **Accept this assignment** — GitHub Classroom will create a personal copy of this repository just for you
-6. Wait a few seconds, then refresh — you will see a link to your own repo
-
-> Your repo is an independent copy. Changes you make do not affect anyone else's, and no other student can see yours.
-
-### What is a Jupyter Notebook?
-
-A Jupyter Notebook is an interactive document that combines code, text, and figures in a single file (`.ipynb`). It is organized into **cells** — each cell contains either code or explanatory text, and you can run cells individually or all at once. When you run a code cell, the output (numbers, plots, etc.) appears directly below it. Notebooks are widely used in science and data analysis because they make it easy to write, run, and inspect code in small chunks.
-
-### What is VS Code?
-
-VS Code (Visual Studio Code) is a free code editor made by Microsoft. It can open and run Jupyter Notebooks directly. It is a popular alternative to running notebooks in a web browser (the classic JupyterLab interface). Both work with the same `.ipynb` files — the choice is just a matter of preference. For this course we use VS Code.
-
-### What is a kernel?
-
-A kernel is the Python engine that actually runs the code in your notebook. When you open a notebook you need to tell it which Python environment to use — in our case that is the `mae223` environment you will create below. Think of the kernel as the engine and the notebook as the dashboard.
+- ZED-F9P connects to OpenLog Artemis via Qwiic/I2C (address 0x42)
+- ZED-F9P connects to ESP32 via I2C for RTCM correction injection
+- Antenna connects to ZED-F9P antenna port
 
 ---
 
-### Step 1 — Install Miniconda
+## Software Requirements
 
-Miniconda is a lightweight Python package manager. It lets you create isolated Python environments so that different projects do not interfere with each other. **Skip this step if you already have Anaconda or Miniconda installed.**
+### Arduino IDE Setup
 
-**Mac:**
-1. Go to https://docs.conda.io/en/latest/miniconda.html
-2. Download the **macOS** installer — choose **Apple Silicon** if you have an M1/M2/M3/M4 Mac, otherwise choose **Intel**
-3. Open the downloaded `.pkg` file and follow the prompts
-4. Open a **Terminal** window: press `Cmd+Space`, type `Terminal`, and hit Enter
-5. Type `conda --version` and press Enter — you should see something like `conda 24.x.x`
+#### Board Packages
 
-**Windows:**
-1. Go to https://docs.conda.io/en/latest/miniconda.html
-2. Download the **Windows 64-bit** installer (`.exe`)
-3. Run the installer. When you reach the **Advanced Options** screen, check **"Add Miniconda3 to my PATH environment variable"**
-4. Click through the remaining prompts and finish the installation
-5. Open **Anaconda Prompt**: click the Windows Start menu, type `Anaconda Prompt`, and open it. A black window will appear — this is your command line and is what you will use for all terminal commands below
-6. Type `conda --version` and press Enter — you should see something like `conda 24.x.x`
+**SparkFun Apollo3 Boards** by SparkFun Electronics
+- Must be version 2.2.1
+- If you get board-related errors, add this URL to Additional Board Manager URLs:
+  ```
+  https://raw.githubusercontent.com/sparkfun/Arduino_Apollo3/main/package_sparkfun_apollo3_index.json
+  ```
+
+**ESP32** by Espressif Systems
+
+#### Partition Scheme (Important)
+
+The `esp32_rtk_wifi` sketch uses both WiFi and BLE, which together exceed the default 1.28MB app partition. Before compiling, set:
+
+`Tools → Partition Scheme → No OTA (Large APP)`
+
+This gives ~2MB for the app. You must set this each time you use a new machine. OTA is not needed for field buoys.
+
+#### Libraries
+
+Install these from the Arduino Library Manager:
+
+- BotleticsSIM7000 by Botletics
+- SparkFun u-blox GNSS Arduino Library by SparkFun Electronics
+- SparkFun u-blox GNSS v3 by SparkFun Electronics
+- SparkFun 9DoF IMU Breakout ICM 20948 Arduino Library by SparkFun Electronics
+- SdFat - Adafruit Fork by Bill Greiman
+- MicroNMEA by Steve Marple (may not be needed)
+
+### Additional Software
+
+Download **u-center** from u-blox for GPS monitoring and configuration.
 
 ---
 
-### Step 2 — Install Git (Windows only)
+## Repository Structure
 
-Mac comes with Git pre-installed. Windows users need to install it manually.
+```
+OpenLog_Artemis_GNSS_Logging_Modified/   # OLA firmware (Arduino sketch)
+    OpenLog_Artemis_GNSS_Logging_Modified.ino
+    upload_ola_firmware.py               # Apple Silicon: compile + upload script
 
-1. Go to https://git-scm.com/download/win and download the installer
-2. Run the installer — the default options are fine, just click through
-3. To verify: open a new Anaconda Prompt, type `git --version`, and press Enter — you should see something like `git version 2.x.x`
+esp32/                                   # ESP32 sketches
+    buoy_combo.ino                       # Main buoy sketch (cellular NTRIP)
+    buoy_combo.h
+    esp32_rtk_wifi.ino                   # WiFi NTRIP + BLE command interface
+    esp32_rtk.ino
+    esp32_botletic.ino
 
-> **Note:** If you installed Git but Anaconda Prompt still says `git: command not found`, close and reopen Anaconda Prompt, then try again.
+accelerometer/                           # ICM-20948 and AK09916 datasheets
+    ICM-20948-Datasheet-v1.3.pdf
+    AK09916-Magnetometer-Datasheet.pdf
 
----
+ubx_parsers/                             # UBX binary to CSV conversion
+    v3_ubx_parser.py
+    v2_ubx_parser.py
 
-### Step 4 — Clone your repository
-
-On your GitHub Classroom repo page, click the green **Code** button and copy the URL. Then in Terminal (Mac) or Anaconda Prompt (Windows) run:
-
-```bash
-git clone <your-repo-url>
+tutorials/                               # Student guides and reference docs
+    IMU_STUDENT_GUIDE.md                 # IMU data logging guide (Arduino IDE + CLI)
+    SERIAL_MONITOR_SETUP.md              # TeraTerm (Windows) and CoolTerm (macOS)
+    GETTING_UPDATES.md                   # How to pull instructor updates
+    ACCELEROMETER_PERFORMANCE_GUIDE.md
+    VSCODE_ARDUINO_SETUP.md
+    LOGGING_ANALYSIS.md
 ```
 
-This downloads all the files to your computer and keeps them connected to your GitHub repo. Navigate into the folder:
+---
 
+## Configuration
+
+### secrets.h
+
+Create a `secrets.h` file in the buoy_combo folder with your NTRIP credentials:
+
+```cpp
+#ifndef SECRETS_H
+#define SECRETS_H
+
+// WiFi credentials (used by esp32_rtk_wifi.ino)
+const char* ssid = "UCSD-GUEST";
+const char* password = "";
+
+// NTRIP caster credentials
+const char* casterHost = "rtk2go.com";
+const uint16_t casterPort = 2101;
+const char* mountPoint = "BASE_CCS";
+const char* casterUser = "your_email";
+const char* casterUserPW = "";
+
+#endif
+```
+
+### UCSD NTRIP Server
+
+For UCSD users on protected WiFi:
+- Address: 132.239.117.27
+- Port: 2101
+- Username: fieldcrew
+- Password: iod.1234
+
+---
+
+## Procedure
+
+### Step 1: Upload OpenLog Artemis Sketch
+
+1. Plug in the Artemis data logger to your computer using USB-C
+2. Upload the OpenLog_Artemis_GNSS_Logging sketch
+   - Set the board to **RedBoard Artemis ATP** (Tools > Board)
+   - Select the correct port (Tools > Port)
+3. Open the Serial Monitor. Baud rate should be 115200
+4. Take note of the datalog number and imulog number
+5. Plug in the 850mAh battery to the Artemis data logger. Make sure the polarity is correct (red goes to positive)
+
+### Step 2: Upload ESP32/Buoy Combo Sketch
+
+1. Plug in the ESP32 to your computer with a micro-B cable
+2. Plug in the 6000mAh battery to the ESP32. Make sure the polarity is correct (red goes to positive)
+3. Upload the buoy_combo sketch
+   - Set the board to **Adafruit ESP32 Feather** (Tools > Board)
+   - Select the correct port (Tools > Port)
+4. Open the Serial Monitor and verify the baud rate is 9600
+
+### Step 3: Verify Connections
+
+Watch the ESP32 Serial Monitor for:
+
+**Network Status:**
+```
+=== Checking Network Status ===
+Signal strength (RSSI): 31 (Excellent)
+Network status 5: Registered roaming
+Network connection confirmed!
+```
+
+**GPRS Configuration:**
+```
+=== Starting GPRS Enable Process ===
+GPRS enabled successfully!
+GPRS verification complete
+```
+
+Note: GPRS configuration may take more than 1 try.
+
+**NTRIP Connection:**
+```
+Attempting NTRIP connection via LTE TCP...
+TCP connection established, sending NTRIP request...
+Found '200' - HTTP OK
+NTRIP connection successful!
+```
+
+### Step 4: Monitor with u-center (Optional)
+
+1. Open u-center
+2. Make sure the port is selected
+3. Under Receiver, ensure NTRIP Client is enabled (check mark next to it)
+4. On the right side, it will show either 3D mode, floating, or fixed
+5. Wait until it says "fixed" to get cm level accuracy
+
+**Note:** u-center does not "enable" the connection - it just lets you see the fix status more easily and view real-time data. If u-center is not connected, you can tell the fix status from the LED on the ZED-F9P:
+- LED solid on = 3D mode
+- LED blinking = floating
+- LED off = fixed mode (cm-level accuracy)
+
+### Step 5: Begin Testing
+
+Once in fixed mode, you're ready to start your test. Data is being recorded to the SD card continuously. Record the start time and end time of your test so you know what data to look at later.
+
+### Step 6: End Testing
+
+1. Type any key into the Serial Monitor in the OpenLog sketch
+2. Type `q`
+3. Type `y`
+4. This ends the logging to the SD card
+5. Unplug all batteries and disconnect everything
+6. Remove the micro SD card from the Artemis data logger
+
+---
+
+## Data Processing
+
+### Parse UBX File
+
+Take the .ubx file and run it through `v2_ubx_parser.py`
+
+Edit the script to set your filenames:
+```python
+if __name__ == "__main__":
+    ubx_filename = "dataLog00008.ubx"
+    csv_filename = "v2_dataLog00008_parsed_positions.csv"
+```
+
+Run:
 ```bash
-cd time-series-analysis-<your-username>
+python3 ./v2_ubx_parser.py
+```
+
+Required Python package:
+```bash
+pip install pyubx2
+```
+
+### Plot GPS Data
+
+Use the output CSV file with `v3_fall_parsed_position_graph.m`
+
+Change `file_name` in the script:
+```matlab
+filename = 'v2_dataLog00008_parsed_positions.csv';
+```
+
+### Plot IMU Data
+
+Use the IMU log file with `simple_IMU_plotting.m`
+
+Change the filename in the script:
+```matlab
+data = readtable('imuLog00013.csv');
 ```
 
 ---
 
-### Step 5 — Create the course environment
+## Output Data Format
 
-This installs all the Python packages needed for the lab into an isolated environment called `mae223`.
+### GPS CSV Columns
 
-```bash
-conda env create -f environment.yml
+- timestamp - UTC time
+- latitude - latitude (degrees)
+- longitude - longitude (degrees)
+- altitude_ellipsoid - Height above ellipsoid (meters)
+- fix_type - GNSS fix type (0-5)
+- carrier_solution - RTK status: 0=None, 1=Float, 2=Fix
+- h_acc - Horizontal accuracy (meters)
+- v_acc - Vertical accuracy (meters)
+
+### IMU CSV Columns
+
+- Timestamp - System timestamp (yyyy/MM/dd HH:mm:ss.SS)
+- Sensor - Sensor identifier ("IMU")
+- AccX, AccY, AccZ - Acceleration (milli-g)
+- GyrX, GyrY, GyrZ - Angular rate (deg/s)
+- MagX, MagY, MagZ - Magnetic field (uT)
+- Temp - Temperature (C)
+
+---
+
+## Menu System
+
+Press any key in the OpenLog Serial Monitor to access the menu:
+
+```
+Menu: Main Menu
+1) Configure Logging
+2) Configure GNSS Device
+3) Configure IMU Sensor
+4) Configure Qwiic Bus
+5) Configure Power Options
+f) Open New Log File
+g) Reset GNSS
+r) Reset all OLA settings to default
+q) Quit: Close log file and power down
+d) Debug Menu
+i) IMU Debug
+x) Return to logging
 ```
 
-This may take a few minutes. When it finishes, run:
+---
 
-```bash
-conda activate mae223
-python -m ipykernel install --user --name mae223 --display-name "mae223"
-```
+## Troubleshooting
 
-The first command activates the environment. The second registers it as a kernel so VS Code can find it.
+### GPS Not Detected
+- Check I2C connections (Qwiic cables)
+- Verify power to ZED-F9P module
+- Make sure antenna has clear sky view
+- Check I2C address (default 0x42)
+
+### NTRIP Connection Fails
+- Verify cellular signal strength (RSSI should be > 10)
+- Check that SIM card is properly inserted and activated
+- Confirm NTRIP credentials in secrets.h
+
+### No RTK Fix
+- Make sure you have a clear sky view with no obstructions
+- Check that RTCM data is being received (watch Serial Monitor)
+- Be patient (could take a few minutes)
+
+### IMU Data Not Logging
+- Enable IMU logging in menu (option 3)
+- Check IMU initialization messages in Serial output
+- Verify SPI connections to ICM-20948
+
+### SD Card Errors
+- Format card as FAT32
+- Use a good quality microSD card
+- Make sure card is properly seated
+- Check that there's enough free space
 
 ---
 
-### Step 6 — Install VS Code
+## Power Estimates
 
-1. Download and install VS Code from https://code.visualstudio.com
-2. Open VS Code and go to the **Extensions** panel — click the square icon on the left sidebar or press `Cmd+Shift+X` (Mac) / `Ctrl+Shift+X` (Windows)
-3. Search for **Python** and click Install
-4. Search for **Jupyter** and click Install
-5. Restart VS Code after both extensions finish installing
+- ZED-F9P: 85 mA
+- OpenLog Artemis: 
+- ESP32 Thing Plus:
+- SIM7000: 110-170mA
+- ANN-MB1: 15mA
 
----
 
-### Step 7 — Open the notebooks
-
-There are two notebooks and they should be done **in order**:
-
-**1. `Tidal Analysis_Python.ipynb` — demo (start here)**
-- Fully written — just run it and read the code and output
-- Introduces the `spectrumCB` function, power spectral density, and tidal analysis
-- No coding required — this is the "watch and understand" step
-
-**2. `Tutorial_SpectralAnalysis.ipynb` — tutorial (do this second)**
-- You write the code yourself, guided by prompts
-- Builds directly on what the demo introduced
-- Requires `la_jolla_tide.json` and `safari_waves.json` (both included in the repo)
-
-The tutorial has two parts:
-
-**Part 1 — Spectral Resolution**
-Using the La Jolla tide gauge record, you will compute spectra with four different chunk sizes and compare them on a single plot. The goal is to build intuition for the tradeoff between frequency resolution and spectral stability — a core concept in Welch's method. Three reflection questions guide your interpretation, including a calculation of the minimum segment length needed to resolve the M₂ and S₂ tidal constituents.
-
-**Part 2 — SAFARI Wave Analysis**
-You will apply the full analysis pipeline to a new dataset: significant wave height (Hs) measured by a research buoy in the central North Pacific (33°25'N, 158°W) during the SAFARI 2025–2026 field campaign — a joint Scripps Institution of Oceanography and Woods Hole Oceanographic Institution (WHOI) collaboration. The data are transmitted via Iridium satellite and are irregularly sampled, so you will need to interpolate onto a regular time grid before computing the spectrum. You will then identify the dominant periods of wave height variability and compare the result to the tidal spectrum from the demo.
-
-> **How to work through the tutorial:** Each code cell either contains fully written code (run it and read it) or has a `# YOUR CODE HERE` comment where you must write something. Read the markdown cells carefully before each exercise — they explain what you need to do and why. Answer the reflection questions in the provided answer cells.
-
-**To open a notebook in VS Code:**
-1. Open the repo folder: **File → Open Folder**, navigate to your `time-series-analysis` folder, and click Open
-2. Click the notebook file in the left file panel
-3. In the top-right corner click **Select Kernel → Select Another Kernel... → Jupyter Kernel... → mae223**
-4. Click **Run All** to execute all cells
-
-> **Note:** Always run cells from top to bottom. If you see a `NameError`, it usually means an earlier cell has not been run yet. Use **Run All** to avoid this.
-
----
-
-### Step 8 — Save your work to GitHub
-
-Push your changes to GitHub periodically as you work through the notebook — this keeps your code backed up and lets you pick up where you left off from any computer.
-
-1. Open the Source Control panel in VS Code: click the branch icon on the left sidebar or press `Cmd+Shift+G` (Mac) / `Ctrl+Shift+G` (Windows)
-2. You will see your modified notebook listed under **Changes**
-3. Click the `+` icon next to the file to stage it
-4. Type a short message describing what you did (e.g. `completed tidal spectrum section`) and click **Commit**
-5. Click **Sync Changes** to push to your GitHub repo
-
-You can push as many times as you like — each push saves a snapshot of your progress.
-
-> **Note:** Lab reports are submitted through Canvas, not GitHub.
