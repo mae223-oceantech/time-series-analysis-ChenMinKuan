@@ -48,6 +48,8 @@ void menuMain()
 
     Serial.println("q) Quit: Close log file and power down");
 
+    Serial.println(F("t) Set UTC Time (for logging without GPS)"));
+
     Serial.println(F("d) Debug Menu"));
 
     Serial.println(F("i) IMU Debug")); // ADDED THIS LINE
@@ -83,6 +85,8 @@ void menuMain()
       else
         Serial.println(F("GNSS reset aborted"));
     }
+    else if (incoming == 't')
+      menuSetUTCTime();
     else if (incoming == 'd')
       menuDebug(&prevPrintMajorDebugMessages, &prevPrintMinorDebugMessages);
     else if (incoming == 'i')  // ADDED THIS BLOCK
@@ -228,5 +232,64 @@ void menuConfigure_QwiicBus()
       printUnknown(incoming);
   }
 
+}
+
+void menuSetUTCTime()
+{
+  Serial.println();
+  Serial.println(F("Menu: Set UTC Time"));
+  Serial.println(F("Enter current UTC time. Press 'x' at any prompt to cancel."));
+
+  // Show current RTC time
+  char timeString[40];
+  getTimeString(timeString);
+  Serial.print(F("Current RTC time: "));
+  Serial.println(timeString);
+  Serial.println();
+
+  Serial.print(F("Year (e.g. 2026): "));
+  int64_t val = getNumber(30);
+  if (val == STATUS_PRESSED_X || val == STATUS_GETNUMBER_TIMEOUT) return;
+  int year = (int)val;
+  if (year < 2000 || year > 2099) { Serial.println(F("Invalid year")); return; }
+
+  Serial.print(F("Month (1-12): "));
+  val = getNumber(30);
+  if (val == STATUS_PRESSED_X || val == STATUS_GETNUMBER_TIMEOUT) return;
+  int month = (int)val;
+  if (month < 1 || month > 12) { Serial.println(F("Invalid month")); return; }
+
+  Serial.print(F("Day (1-31): "));
+  val = getNumber(30);
+  if (val == STATUS_PRESSED_X || val == STATUS_GETNUMBER_TIMEOUT) return;
+  int day = (int)val;
+  if (day < 1 || day > 31) { Serial.println(F("Invalid day")); return; }
+
+  Serial.print(F("Hour (0-23): "));
+  val = getNumber(30);
+  if (val == STATUS_PRESSED_X || val == STATUS_GETNUMBER_TIMEOUT) return;
+  int hour = (int)val;
+  if (hour < 0 || hour > 23) { Serial.println(F("Invalid hour")); return; }
+
+  Serial.print(F("Minute (0-59): "));
+  val = getNumber(30);
+  if (val == STATUS_PRESSED_X || val == STATUS_GETNUMBER_TIMEOUT) return;
+  int minute = (int)val;
+  if (minute < 0 || minute > 59) { Serial.println(F("Invalid minute")); return; }
+
+  Serial.print(F("Second (0-59): "));
+  val = getNumber(30);
+  if (val == STATUS_PRESSED_X || val == STATUS_GETNUMBER_TIMEOUT) return;
+  int second = (int)val;
+  if (second < 0 || second > 59) { Serial.println(F("Invalid second")); return; }
+
+  myRTC.setTime(0, second, minute, hour, day, month, (year - 2000));
+  rtcHasBeenSyncd = true;
+  rtcNeedsSync = false;
+
+  Serial.println();
+  Serial.print(F("RTC set to: "));
+  getTimeString(timeString);
+  Serial.println(timeString);
 }
 

@@ -295,7 +295,12 @@ void setup() {
   }
 
   if (beginSensors() == true) Serial.println(F("GNSS online"));
-  else Serial.println(F("GNSS offline"));
+  else
+  {
+    Serial.println(F("GNSS offline"));
+    // No GPS available — set RTC from compile time so IMU logs have approximate UTC timestamps
+    setRTCFromCompileTime();
+  }
 
   //If we are sleeping between readings then we cannot rely on millis() as it is powered down. Used RTC instead.
   measurementStartTime = rtcMillis();
@@ -620,10 +625,34 @@ int floatToStr(char *buf, int bufSize, float val, int decimals) {
 }
 
 // Uses a static char buffer instead of String to avoid heap fragmentation.
+// Parse __DATE__ ("Apr  8 2026") and __TIME__ ("16:56:45") to set the RTC
+void setRTCFromCompileTime() {
+  const char *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  char monthStr[4];
+  int day, year, hour, minute, second;
+
+  // __DATE__ format: "Mmm dd yyyy" (dd may have leading space)
+  sscanf(__DATE__, "%3s %d %d", monthStr, &day, &year);
+  sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second);
+
+  // Convert month string to number (1-12)
+  const char *found = strstr(months, monthStr);
+  int month = ((found - months) / 3) + 1;
+
+  myRTC.setTime(0, second, minute, hour, day, month, (year - 2000));
+  rtcHasBeenSyncd = true;
+  rtcNeedsSync = false;
+
+  Serial.print(F("RTC set from compile time: "));
+  char timeString[40];
+  getTimeString(timeString);
+  Serial.println(timeString);
+}
+
 int createIMUDataString(char *buf, int bufSize) {
   int pos = 0;
 
-  // Add timestamp
+  // Add timestamp and millis
   char timeString[40];
   getTimeString(timeString);
   pos += snprintf(buf + pos, bufSize - pos, "%s,IMU", timeString);
